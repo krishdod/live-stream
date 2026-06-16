@@ -30,11 +30,20 @@ function sendAnswer(text) {
 function checkAnswer(source) {
   const answer = getLatestAnswer();
 
-  if (answer && answer !== previousAnswer) {
-    previousAnswer = answer;
-    console.log(`[Perplexity Live Stream] ANSWER CHANGED (${source})`);
-    sendAnswer(answer);
+  if (!answer || answer === previousAnswer) {
+    return;
   }
+
+  if (
+    previousAnswer &&
+    answer.length < previousAnswer.length * 0.3
+  ) {
+    sendAnswer("");
+  }
+
+  previousAnswer = answer;
+  console.log(`[Perplexity Live Stream] ANSWER CHANGED (${source})`);
+  sendAnswer(answer);
 }
 
 const initialMatches = document.querySelectorAll(ANSWER_SELECTOR).length;
