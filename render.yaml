@@ -6,3 +6,10 @@ services:
     buildCommand: npm install
     startCommand: npm start
     plan: free
+    envVars:
+      - key: STREAM_KEY
+        sync: false
+      - key: EDIT_KEY
+        sync: false
+      - key: VIEW_KEY
+        sync: false

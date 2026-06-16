@@ -20,10 +20,12 @@ function getLatestAnswer() {
 }
 
 function sendAnswer(text) {
-  chrome.runtime.sendMessage({ type: "answer", text }, (response) => {
-    if (chrome.runtime.lastError) {
-      console.error("[Live Workspace] SEND FAILED", chrome.runtime.lastError.message);
-    }
+  fetch(`${SERVER_URL}/answer`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ text, key: STREAM_KEY || "" })
+  }).catch((err) => {
+    console.error("[Live Workspace] SEND FAILED", err);
   });
 }
 
