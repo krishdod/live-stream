@@ -10,13 +10,13 @@ function sendAnswer(text) {
   })
     .then((response) => ({ sent: response.ok }))
     .catch((err) => {
-      console.error("[Perplexity Live Stream] SEND FAILED", err);
+      console.error("[Live Workspace] SEND FAILED", err);
       return { sent: false };
     });
 }
 
 chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
-  if (msg.type !== "answer" || !msg.text) {
+  if (msg?.type !== "answer" || typeof msg.text !== "string") {
     return;
   }
 

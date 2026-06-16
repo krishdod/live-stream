@@ -1,11 +1,11 @@
-# Perplexity Live Stream
+# Live Workspace
 
-Stream your Perplexity AI answers live to a teammate's browser in real time.
+Stream live text from your browser to a teammate in real time.
 
 ```
-Perplexity on your PC
+Your chat page
       ↓
-Chrome Extension detects answer text
+Chrome Extension detects text changes
       ↓
 Sends to relay server
       ↓
@@ -15,10 +15,10 @@ Teammate sees same text live
 ## Project structure
 
 ```
-perplexity-live-stream/
+live-workspace/
 ├── manifest.json      # Chrome extension manifest
-├── content.js         # Watches Perplexity for answer changes
-├── background.js      # Sends answers to the relay server
+├── content.js         # Watches the page for answer changes
+├── background.js      # Sends text to the relay server
 ├── config.js          # Server URL (local or Render)
 ├── render.yaml        # Render deployment config
 └── server/
@@ -31,15 +31,14 @@ perplexity-live-stream/
 
 - Google Chrome
 - Node.js 18+ (for local server or Render deploy)
-- A Perplexity account at [perplexity.ai](https://www.perplexity.ai)
 
 ## 1. Install the Chrome extension
 
 1. Open Chrome and go to `chrome://extensions`
 2. Enable **Developer mode** (top right)
 3. Click **Load unpacked**
-4. Select the `perplexity-live-stream` folder
-5. You should see **Perplexity Live Stream** enabled
+4. Select the project folder
+5. You should see **Live Workspace** enabled
 
 ## 2. Run locally (same network)
 
@@ -74,9 +73,9 @@ Reload the extension at `chrome://extensions`.
 
 ### Test
 
-1. Open [perplexity.ai](https://www.perplexity.ai) and ask a question
+1. Open your chat page and ask a question
 2. Open `http://localhost:8765` (or share your IP link with teammate)
-3. The answer should appear live as Perplexity generates it
+3. The text should appear live as it generates
 
 ## 3. Deploy to Render (remote teammates)
 
@@ -85,12 +84,9 @@ Use this when your teammate is **not on the same network**.
 ### Push to GitHub
 
 ```powershell
-cd perplexity-live-stream
-git init
 git add .
-git commit -m "Initial commit"
-git remote add origin https://github.com/YOUR-USERNAME/perplexity-live-stream.git
-git push -u origin main
+git commit -m "Deploy Live Workspace"
+git push
 ```
 
 ### Deploy on Render
@@ -99,14 +95,14 @@ git push -u origin main
 2. Click **New +** → **Blueprint**
 3. Connect your GitHub repo
 4. Render reads `render.yaml` and deploys automatically
-5. Copy your app URL, e.g. `https://perplexity-live-stream.onrender.com`
+5. Copy your app URL, e.g. `https://live-workspace.onrender.com`
 
 ### Update extension config
 
 In `config.js`:
 
 ```js
-const SERVER_URL = "https://perplexity-live-stream.onrender.com";
+const SERVER_URL = "https://live-workspace.onrender.com";
 ```
 
 Reload the extension at `chrome://extensions`.
@@ -116,7 +112,7 @@ Reload the extension at `chrome://extensions`.
 Send them your Render URL:
 
 ```
-https://perplexity-live-stream.onrender.com
+https://live-workspace.onrender.com
 ```
 
 They open it anywhere — no VPN or same Wi‑Fi needed.
@@ -136,17 +132,16 @@ If you don't want to deploy yet:
 
 | Component | Role |
 |-----------|------|
-| `content.js` | Watches `div.prose[data-renderer="lm"]` on Perplexity for text changes |
-| `background.js` | POSTs answer text to the relay server |
+| `content.js` | Watches the page for text changes |
+| `background.js` | POSTs text to the relay server |
 | `server.js` | Receives POST at `/answer`, broadcasts to viewers via WebSocket |
-| `viewer.html` | Displays live answer text for teammates |
+| `viewer.html` | Displays live text for teammates |
 
 ## Troubleshooting
 
-### Extension not detecting answers
+### Extension not detecting text
 
-- Make sure you're on `https://www.perplexity.ai`
-- Open DevTools → Console and look for `[Perplexity Live Stream] ANSWER CHANGED`
+- Open DevTools → Console and look for `[Live Workspace] ANSWER CHANGED`
 - Reload the extension after any code changes
 
 ### Viewer shows "Connected" but no text
@@ -154,7 +149,7 @@ If you don't want to deploy yet:
 - Check `config.js` has the correct `SERVER_URL`
 - Reload the extension
 - Restart the server (local) or redeploy (Render)
-- Ask a **new** question on Perplexity to trigger an update
+- Ask a **new** question to trigger an update
 
 ### `npm` blocked on Windows (PowerShell)
 

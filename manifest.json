@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
-  "name": "Perplexity Live Stream",
-  "version": "1.6",
+  "name": "Live Workspace",
+  "version": "1.7",
   "background": {
     "service_worker": "background.js"
   },

@@ -39,9 +39,10 @@ const server = http.createServer((req, res) => {
     req.on("end", () => {
       try {
         const parsed = JSON.parse(body || "{}");
-        const text = typeof parsed.text === "string" ? parsed.text : "";
+        const text = typeof parsed.text === "string" ? parsed.text : null;
 
-        if (text) {
+        // Allow empty string to explicitly clear the viewer.
+        if (text !== null) {
           lastAnswer = text;
           broadcast({ type: "answer", text }, null);
         }

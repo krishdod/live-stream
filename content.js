@@ -1,4 +1,4 @@
-console.log("[Perplexity Live Stream] Extension loaded on:", location.href);
+console.log("[Live Workspace] Extension loaded on:", location.href);
 
 const ANSWER_SELECTOR = 'div.prose[data-renderer="lm"]';
 const ANSWER_FALLBACK = "div.prose[data-renderer]";
@@ -22,7 +22,7 @@ function getLatestAnswer() {
 function sendAnswer(text) {
   chrome.runtime.sendMessage({ type: "answer", text }, (response) => {
     if (chrome.runtime.lastError) {
-      console.error("[Perplexity Live Stream] SEND FAILED", chrome.runtime.lastError.message);
+      console.error("[Live Workspace] SEND FAILED", chrome.runtime.lastError.message);
     }
   });
 }
@@ -42,13 +42,13 @@ function checkAnswer(source) {
   }
 
   previousAnswer = answer;
-  console.log(`[Perplexity Live Stream] ANSWER CHANGED (${source})`);
+  console.log(`[Live Workspace] ANSWER CHANGED (${source})`);
   sendAnswer(answer);
 }
 
 const initialMatches = document.querySelectorAll(ANSWER_SELECTOR).length;
 console.log(
-  `[Perplexity Live Stream] Found ${initialMatches} answer element(s) on load`
+  `[Live Workspace] Found ${initialMatches} answer element(s) on load`
 );
 
 const initialAnswer = getLatestAnswer();
@@ -56,7 +56,7 @@ if (initialAnswer) {
   previousAnswer = initialAnswer;
   sendAnswer(initialAnswer);
 } else {
-  console.log("[Perplexity Live Stream] No answer yet — ask a question to test");
+  console.log("[Live Workspace] No answer yet — ask a question to test");
 }
 
 const observer = new MutationObserver(() => {
