@@ -1,0 +1,88 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Perplexity Live Viewer</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: Georgia, "Times New Roman", serif;
+      background: #1a1a1a;
+      color: #e8e8e8;
+      min-height: 100vh;
+      padding: 2rem;
+      line-height: 1.7;
+    }
+
+    header {
+      font-family: system-ui, sans-serif;
+      font-size: 0.85rem;
+      color: #888;
+      margin-bottom: 1.5rem;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    #status {
+      padding: 0.25rem 0.6rem;
+      border-radius: 4px;
+      font-size: 0.75rem;
+    }
+
+    #status.connected { background: #1a3a1a; color: #6f6; }
+    #status.disconnected { background: #3a1a1a; color: #f66; }
+
+    #answer {
+      white-space: pre-wrap;
+      font-size: 1.05rem;
+      max-width: 720px;
+      min-height: 1.5rem;
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <span>Perplexity Live Viewer</span>
+    <span id="status" class="disconnected">Disconnected</span>
+  </header>
+  <div id="answer"></div>
+
+  <script>
+    const answerEl = document.getElementById("answer");
+    const statusEl = document.getElementById("status");
+    const wsProtocol = location.protocol === "https:" ? "wss:" : "ws:";
+    const wsUrl = `${wsProtocol}//${location.host}`;
+
+    function connect() {
+      const ws = new WebSocket(wsUrl);
+
+      ws.onopen = () => {
+        statusEl.textContent = "Connected";
+        statusEl.className = "connected";
+      };
+
+      ws.onmessage = (event) => {
+        try {
+          const msg = JSON.parse(event.data);
+          if (msg.type === "answer" && msg.text) {
+            answerEl.textContent = msg.text;
+          }
+        } catch {
+          // ignore
+        }
+      };
+
+      ws.onclose = () => {
+        statusEl.textContent = "Disconnected";
+        statusEl.className = "disconnected";
+        setTimeout(connect, 2000);
+      };
+    }
+
+    connect();
+  </script>
+</body>
+</html>
