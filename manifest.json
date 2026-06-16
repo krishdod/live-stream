@@ -1,12 +1,7 @@
 {
   "manifest_version": 3,
   "name": "Live Workspace",
-  "version": "2.0",
-  "icons": {
-    "16": "icon16.png",
-    "48": "icon48.png",
-    "128": "icon128.png"
-  },
+  "version": "2.1",
   "background": {
     "service_worker": "background.js"
   },

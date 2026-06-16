@@ -5,7 +5,6 @@ const WebSocket = require("ws");
 
 const PORT = process.env.PORT || 8765;
 const viewerPath = path.join(__dirname, "viewer.html");
-const faviconPath = path.join(__dirname, "favicon.png");
 
 let lastAnswer = "";
 
@@ -21,12 +20,6 @@ const server = http.createServer((req, res) => {
   if (req.method === "OPTIONS") {
     res.writeHead(204);
     res.end();
-    return;
-  }
-
-  if (req.url === "/favicon.png" || req.url === "/favicon.ico") {
-    res.writeHead(200, { "Content-Type": "image/png" });
-    res.end(fs.readFileSync(faviconPath));
     return;
   }
 
