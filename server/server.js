@@ -5,8 +5,7 @@ const WebSocket = require("ws");
 
 const PORT = process.env.PORT || 8765;
 const viewerPath = path.join(__dirname, "viewer.html");
-const logoPath = path.join(__dirname, "logo.svg");
-const faviconPath = path.join(__dirname, "favicon.svg");
+const faviconPath = path.join(__dirname, "favicon.png");
 
 let lastAnswer = "";
 
@@ -25,14 +24,8 @@ const server = http.createServer((req, res) => {
     return;
   }
 
-  if (req.url === "/logo.svg" || req.url === "/logo.png") {
-    res.writeHead(200, { "Content-Type": "image/svg+xml" });
-    res.end(fs.readFileSync(logoPath));
-    return;
-  }
-
-  if (req.url === "/favicon.svg" || req.url === "/favicon.ico" || req.url === "/favicon.png") {
-    res.writeHead(200, { "Content-Type": "image/svg+xml" });
+  if (req.url === "/favicon.png" || req.url === "/favicon.ico") {
+    res.writeHead(200, { "Content-Type": "image/png" });
     res.end(fs.readFileSync(faviconPath));
     return;
   }

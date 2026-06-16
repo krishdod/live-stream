@@ -5,8 +5,8 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
 <title>Live Workspace</title>
-<link rel="icon" type="image/svg+xml" href="/favicon.svg">
-<link rel="apple-touch-icon" href="/logo.svg">
+<link rel="icon" type="image/png" href="/favicon.png">
+<link rel="apple-touch-icon" href="/favicon.png">
 
 <style>
 *{
@@ -38,14 +38,9 @@ body{
 }
 
 .logo{
-  display:flex;
-  align-items:center;
-}
-
-.logo-img{
-  height:34px;
-  width:auto;
-  display:block;
+  font-size:16px;
+  font-weight:700;
+  letter-spacing:.2px;
 }
 
 .status{
@@ -113,8 +108,8 @@ body{
     align-items:flex-start;
   }
 
-  .logo-img{
-    height:28px;
+  .logo{
+    font-size:16px;
   }
 
   .workspace{
@@ -137,7 +132,7 @@ body{
 
   <div class="header">
       <div class="logo">
-          <img src="/logo.svg" alt="Live Workspace" class="logo-img">
+          Live Workspace
       </div>
 
       <div id="status" class="status disconnected">
