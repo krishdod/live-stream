@@ -124,7 +124,7 @@ const server = http.createServer((req, res) => {
 
         if (text !== null) {
           lastAnswer = text;
-          broadcast({ type: "answer", text }, null);
+          broadcast({ type: "sync", text, from: "stream" }, null);
         }
 
         res.writeHead(204);
@@ -154,6 +154,8 @@ function broadcast(msg, sender) {
   });
 }
 
+let clientCounter = 0;
+
 wss.on("connection", (ws, req) => {
   const params = parseQuery(req.url || "");
   const auth = validateRole(params.get("role"), params.get("key"));
@@ -164,11 +166,12 @@ wss.on("connection", (ws, req) => {
   }
 
   ws.role = auth.role;
+  ws.clientId = `c${++clientCounter}`;
 
-  ws.send(JSON.stringify({ type: "auth", role: auth.role }));
+  ws.send(JSON.stringify({ type: "auth", role: auth.role, clientId: ws.clientId }));
 
   if (lastAnswer) {
-    ws.send(JSON.stringify({ type: "answer", text: lastAnswer }));
+    ws.send(JSON.stringify({ type: "sync", text: lastAnswer, from: "server" }));
   }
 
   ws.on("message", (raw) => {
@@ -177,8 +180,14 @@ wss.on("connection", (ws, req) => {
     try {
       const msg = JSON.parse(raw);
 
-      if (msg.type === "answer" && typeof msg.text === "string") {
+      if (msg.type === "sync" && typeof msg.text === "string") {
         lastAnswer = msg.text;
+        msg.clientId = ws.clientId;
+        broadcast(msg, ws);
+      }
+
+      if (msg.type === "selection" && typeof msg.start === "number") {
+        msg.clientId = ws.clientId;
         broadcast(msg, ws);
       }
     } catch {

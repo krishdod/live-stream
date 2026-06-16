@@ -102,6 +102,23 @@ body {
 
 #answer.view-only:empty::before { content: "Waiting for live content..."; }
 
+#remoteSelBar {
+  font-size: 12px;
+  color: #60a5fa;
+  background: #0d1f33;
+  border: 1px solid #1e3a5f;
+  border-radius: 8px;
+  padding: 8px 12px;
+  margin-bottom: 10px;
+  display: none;
+}
+
+#remoteSelBar.visible { display: block; }
+
+::highlight(remote-selection) {
+  background-color: rgba(66, 133, 244, 0.35);
+}
+
 .footer { margin-top: 12px; font-size: 12px; color: #666; }
 .hidden { display: none !important; }
 
@@ -254,6 +271,7 @@ body {
       </div>
     </div>
     <div class="workspace">
+      <div id="remoteSelBar"></div>
       <div id="answer" contenteditable="true" spellcheck="true"></div>
     </div>
     <div class="footer">Last Updated: <span id="updatedAt">--</span></div>
@@ -300,11 +318,17 @@ const shareOverlay = document.getElementById("shareOverlay");
 const linkRole = document.getElementById("linkRole");
 const accessDesc = document.getElementById("accessDesc");
 const copyToast = document.getElementById("copyToast");
+const remoteSelBar = document.getElementById("remoteSelBar");
 
 let autoCopy = localStorage.getItem("lw-auto-copy") === "true";
 let userRole = "edit";
 let accessKey = "";
 let shareLinks = { viewLink: "", editLink: "" };
+let clientId = "";
+let ws = null;
+let applyingRemote = false;
+let syncTimer = null;
+let selTimer = null;
 
 function setAutoCopy(on) {
   autoCopy = on;
@@ -313,10 +337,121 @@ function setAutoCopy(on) {
   autoCopyBtn.classList.toggle("on", on);
 }
 
-function applyIncoming(text) {
-  if (!autoCopy && userRole === "edit") return;
+function applyRemoteText(text) {
+  applyingRemote = true;
   answerEl.textContent = text;
+  applyingRemote = false;
   updatedAt.textContent = new Date().toLocaleTimeString();
+  clearRemoteSelection();
+}
+
+function applyIncomingStream(text) {
+  if (!autoCopy && userRole === "edit") return;
+  applyRemoteText(text);
+}
+
+function sendSync() {
+  if (!ws || ws.readyState !== WebSocket.OPEN || userRole !== "edit") return;
+  ws.send(JSON.stringify({ type: "sync", text: answerEl.textContent }));
+}
+
+function scheduleSync() {
+  clearTimeout(syncTimer);
+  syncTimer = setTimeout(sendSync, 200);
+}
+
+function getSelectionOffsets() {
+  const sel = window.getSelection();
+  if (!sel || !sel.rangeCount) return null;
+
+  const range = sel.getRangeAt(0);
+  if (!answerEl.contains(range.commonAncestorContainer)) return null;
+
+  const pre = document.createRange();
+  pre.selectNodeContents(answerEl);
+  pre.setEnd(range.startContainer, range.startOffset);
+  const start = pre.toString().length;
+  const end = start + range.toString().length;
+
+  return { start, end, text: range.toString() };
+}
+
+function getRangeFromOffsets(start, end) {
+  const range = document.createRange();
+  const walker = document.createTreeWalker(answerEl, NodeFilter.SHOW_TEXT);
+  let pos = 0;
+  let startNode = null;
+  let startOff = 0;
+  let endNode = null;
+  let endOff = 0;
+
+  while (walker.nextNode()) {
+    const node = walker.currentNode;
+    const len = node.textContent.length;
+    if (!startNode && pos + len >= start) {
+      startNode = node;
+      startOff = start - pos;
+    }
+    if (pos + len >= end) {
+      endNode = node;
+      endOff = end - pos;
+      break;
+    }
+    pos += len;
+  }
+
+  if (!startNode || !endNode) return null;
+  range.setStart(startNode, startOff);
+  range.setEnd(endNode, endOff);
+  return range;
+}
+
+function clearRemoteSelection() {
+  if (CSS.highlights) CSS.highlights.delete("remote-selection");
+  remoteSelBar.classList.remove("visible");
+  remoteSelBar.textContent = "";
+}
+
+function showRemoteSelection(msg) {
+  if (msg.clientId === clientId) return;
+
+  clearRemoteSelection();
+
+  if (msg.start === msg.end) return;
+
+  const range = getRangeFromOffsets(msg.start, msg.end);
+  if (range && CSS.highlights) {
+    CSS.highlights.set("remote-selection", new Highlight(range));
+  }
+
+  const preview = (msg.text || "").trim();
+  if (preview) {
+    const short = preview.length > 80 ? `${preview.slice(0, 80)}…` : preview;
+    remoteSelBar.textContent = `Partner selected: "${short}"`;
+    remoteSelBar.classList.add("visible");
+  }
+}
+
+function sendSelection() {
+  if (!ws || ws.readyState !== WebSocket.OPEN || userRole !== "edit") return;
+
+  const sel = getSelectionOffsets();
+  if (!sel) {
+    ws.send(JSON.stringify({ type: "selection", start: 0, end: 0, text: "" }));
+    return;
+  }
+
+  ws.send(JSON.stringify({
+    type: "selection",
+    start: sel.start,
+    end: sel.end,
+    text: sel.text
+  }));
+}
+
+function scheduleSelection() {
+  clearTimeout(selTimer);
+  selTimer = setTimeout(sendSelection, 100);
 }
 
 function applyRole(role) {
@@ -427,10 +562,20 @@ shareOverlay.addEventListener("click", (e) => {
 
 autoCopyBtn.addEventListener("click", () => setAutoCopy(!autoCopy));
 
+answerEl.addEventListener("input", () => {
+  if (applyingRemote || userRole !== "edit") return;
+  scheduleSync();
+});
+
+document.addEventListener("selectionchange", () => {
+  if (userRole !== "edit") return;
+  scheduleSelection();
+});
+
 function connect() {
   const wsProtocol = location.protocol === "https:" ? "wss:" : "ws:";
   const qs = `role=${encodeURIComponent(userRole)}&key=${encodeURIComponent(accessKey)}`;
-  const ws = new WebSocket(`${wsProtocol}//${location.host}?${qs}`);
+  ws = new WebSocket(`${wsProtocol}//${location.host}?${qs}`);
 
   ws.onopen = () => {
     statusEl.textContent = "Connected";
@@ -440,8 +585,23 @@ function connect() {
   ws.onmessage = (event) => {
     try {
       const msg = JSON.parse(event.data);
-      if (msg.type === "auth") applyRole(msg.role);
-      if (msg.type === "answer" && typeof msg.text === "string") applyIncoming(msg.text);
+
+      if (msg.type === "auth") {
+        clientId = msg.clientId || "";
+        applyRole(msg.role);
+      }
+
+      if (msg.type === "sync" && typeof msg.text === "string") {
+        if (msg.from === "stream") {
+          applyIncomingStream(msg.text);
+        } else if (msg.clientId !== clientId) {
+          applyRemoteText(msg.text);
+        }
+      }
+
+      if (msg.type === "selection") {
+        showRemoteSelection(msg);
+      }
     } catch {}
   };
 

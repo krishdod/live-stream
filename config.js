@@ -4,4 +4,4 @@ var SERVER_URL = "https://live-workspace.onrender.com";
 
 // Must match STREAM_KEY on Render (Environment variables).
 // Leave empty if security is disabled on the server.
-var STREAM_KEY = "";
+var STREAM_KEY = "c6fb492f5475b8f28957b056fe46267e";
