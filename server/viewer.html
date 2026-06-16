@@ -147,7 +147,43 @@ body {
 .share-modal h2 {
   font-size: 22px;
   font-weight: 400;
+  margin-bottom: 16px;
+}
+
+.share-email-row {
+  display: flex;
+  gap: 8px;
   margin-bottom: 20px;
+}
+
+#shareEmail {
+  flex: 1;
+  padding: 12px 14px;
+  border: 1px solid #dadce0;
+  border-radius: 24px;
+  font-size: 14px;
+  outline: none;
+}
+
+#shareEmail:focus {
+  border-color: #1a73e8;
+}
+
+#sendEmailBtn {
+  padding: 10px 18px;
+  border: none;
+  border-radius: 999px;
+  background: #1a73e8;
+  color: #fff;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+#sendEmailBtn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
 }
 
 .share-section-title {
@@ -281,6 +317,10 @@ body {
 <div id="shareOverlay" class="hidden">
   <div class="share-modal">
     <h2>Share "Live Workspace"</h2>
+    <div class="share-email-row">
+      <input id="shareEmail" type="email" placeholder="Add people by email">
+      <button id="sendEmailBtn">Send</button>
+    </div>
     <div class="share-section-title">General access</div>
     <div class="share-general">
       <div class="share-globe">🌐</div>
@@ -550,6 +590,48 @@ document.getElementById("copyLinkBtn").addEventListener("click", async () => {
   const link = getSelectedLink();
   await navigator.clipboard.writeText(link);
   copyToast.textContent = "Link copied to clipboard";
+});
+
+document.getElementById("sendEmailBtn").addEventListener("click", async () => {
+  const email = document.getElementById("shareEmail").value.trim();
+  const btn = document.getElementById("sendEmailBtn");
+
+  if (!email) {
+    copyToast.textContent = "Enter an email address";
+    return;
+  }
+
+  btn.disabled = true;
+  copyToast.textContent = "Sending...";
+
+  try {
+    const res = await fetch("/api/send-invite", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        email,
+        linkRole: linkRole.value,
+        role: userRole,
+        key: accessKey
+      })
+    });
+
+    const data = await res.json();
+
+    if (res.ok) {
+      copyToast.textContent = `Invite sent to ${email}`;
+      document.getElementById("shareEmail").value = "";
+    } else if (data.mailto) {
+      window.location.href = data.mailto;
+      copyToast.textContent = "Opening your email app...";
+    } else {
+      copyToast.textContent = data.error || "Could not send email";
+    }
+  } catch {
+    copyToast.textContent = "Could not send email";
+  }
+
+  btn.disabled = false;
 });
 
 document.getElementById("shareDoneBtn").addEventListener("click", () => {

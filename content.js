@@ -1,22 +1,35 @@
 console.log("[Live Workspace] Extension loaded on:", location.href);
 
-const ANSWER_SELECTOR = 'div.prose[data-renderer="lm"]';
-const ANSWER_FALLBACK = "div.prose[data-renderer]";
+const SITE = location.hostname.includes("chatgpt") || location.hostname.includes("openai")
+  ? "chatgpt"
+  : "perplexity";
+
+const SELECTORS = {
+  perplexity: [
+    'div.prose[data-renderer="lm"]',
+    "div.prose[data-renderer]"
+  ],
+  chatgpt: [
+    '[data-message-author-role="assistant"] .markdown',
+    '[data-message-author-role="assistant"]',
+    'article[data-turn="assistant"] .markdown',
+    'article[data-turn="assistant"]'
+  ]
+};
 
 let previousAnswer = "";
 
 function getLatestAnswer() {
-  let answers = document.querySelectorAll(ANSWER_SELECTOR);
+  const selectors = SELECTORS[SITE] || SELECTORS.perplexity;
 
-  if (answers.length === 0) {
-    answers = document.querySelectorAll(ANSWER_FALLBACK);
+  for (const selector of selectors) {
+    const nodes = document.querySelectorAll(selector);
+    if (nodes.length > 0) {
+      return nodes[nodes.length - 1].innerText.trim();
+    }
   }
 
-  if (answers.length === 0) {
-    return "";
-  }
-
-  return answers[answers.length - 1].innerText.trim();
+  return "";
 }
 
 function sendAnswer(text) {
@@ -48,10 +61,7 @@ function checkAnswer(source) {
   sendAnswer(answer);
 }
 
-const initialMatches = document.querySelectorAll(ANSWER_SELECTOR).length;
-console.log(
-  `[Live Workspace] Found ${initialMatches} answer element(s) on load`
-);
+console.log(`[Live Workspace] Watching: ${SITE}`);
 
 const initialAnswer = getLatestAnswer();
 if (initialAnswer) {

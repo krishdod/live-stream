@@ -2,6 +2,7 @@ const http = require("http");
 const fs = require("fs");
 const path = require("path");
 const WebSocket = require("ws");
+const nodemailer = require("nodemailer");
 
 const PORT = process.env.PORT || 8765;
 const viewerPath = path.join(__dirname, "viewer.html");
@@ -9,6 +10,39 @@ const viewerPath = path.join(__dirname, "viewer.html");
 const STREAM_KEY = process.env.STREAM_KEY || "";
 const EDIT_KEY = process.env.EDIT_KEY || "";
 const VIEW_KEY = process.env.VIEW_KEY || "";
+
+const SMTP_HOST = process.env.SMTP_HOST || "";
+const SMTP_PORT = Number(process.env.SMTP_PORT || 587);
+const SMTP_USER = process.env.SMTP_USER || "";
+const SMTP_PASS = process.env.SMTP_PASS || "";
+const EMAIL_FROM = process.env.EMAIL_FROM || SMTP_USER || "noreply@liveworkspace.app";
+
+let mailer = null;
+
+if (SMTP_HOST && SMTP_USER && SMTP_PASS) {
+  mailer = nodemailer.createTransport({
+    host: SMTP_HOST,
+    port: SMTP_PORT,
+    secure: SMTP_PORT === 465,
+    auth: { user: SMTP_USER, pass: SMTP_PASS }
+  });
+}
+
+async function sendInviteEmail(to, role, link) {
+  const roleLabel = role === "edit" ? "Editor" : "Viewer";
+  const subject = "You've been invited to Live Workspace";
+  const text =
+    `You've been invited to collaborate on Live Workspace as ${roleLabel}.\n\n` +
+    `Open this link:\n${link}\n\n` +
+    `Anyone with this link can ${role === "edit" ? "edit" : "view"} the workspace.`;
+
+  const html =
+    `<p>You've been invited to collaborate on <strong>Live Workspace</strong> as <strong>${roleLabel}</strong>.</p>` +
+    `<p><a href="${link}">Open Live Workspace</a></p>` +
+    `<p style="color:#666;font-size:13px">Or copy this link:<br>${link}</p>`;
+
+  await mailer.sendMail({ from: EMAIL_FROM, to, subject, text, html });
+}
 
 let lastAnswer = "";
 
@@ -85,6 +119,62 @@ const server = http.createServer((req, res) => {
       editLink: `${base}/?role=edit&key=${encodeURIComponent(EDIT_KEY)}`,
       secured: securityEnabled()
     }));
+    return;
+  }
+
+  if (pathname === "/api/send-invite" && req.method === "POST") {
+    let body = "";
+    req.on("data", (chunk) => {
+      body += chunk.toString("utf8");
+    });
+
+    req.on("end", async () => {
+      try {
+        const parsed = JSON.parse(body || "{}");
+        const auth = validateRole(parsed.role, parsed.key);
+
+        if (!auth.ok || auth.role !== "edit") {
+          res.writeHead(403, { "Content-Type": "application/json" });
+          res.end(JSON.stringify({ error: "Forbidden" }));
+          return;
+        }
+
+        const email = typeof parsed.email === "string" ? parsed.email.trim() : "";
+        const linkRole = parsed.linkRole === "edit" ? "edit" : "view";
+
+        if (!email || !email.includes("@")) {
+          res.writeHead(400, { "Content-Type": "application/json" });
+          res.end(JSON.stringify({ error: "Invalid email" }));
+          return;
+        }
+
+        const host = req.headers.host || `localhost:${PORT}`;
+        const proto = req.headers["x-forwarded-proto"] || "http";
+        const base = `${proto}://${host}`;
+        const link =
+          linkRole === "edit"
+            ? `${base}/?role=edit&key=${encodeURIComponent(EDIT_KEY)}`
+            : `${base}/?role=view&key=${encodeURIComponent(VIEW_KEY)}`;
+
+        if (!mailer) {
+          res.writeHead(503, { "Content-Type": "application/json" });
+          res.end(JSON.stringify({
+            error: "Email not configured",
+            mailto: `mailto:${encodeURIComponent(email)}?subject=${encodeURIComponent("Live Workspace invite")}&body=${encodeURIComponent(`Open this link:\n${link}`)}`
+          }));
+          return;
+        }
+
+        await sendInviteEmail(email, linkRole, link);
+
+        res.writeHead(200, { "Content-Type": "application/json" });
+        res.end(JSON.stringify({ ok: true }));
+      } catch {
+        res.writeHead(500, { "Content-Type": "application/json" });
+        res.end(JSON.stringify({ error: "Failed to send email" }));
+      }
+    });
+
     return;
   }
 

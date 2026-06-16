@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "Live Workspace",
-  "version": "3.5",
+  "version": "3.7",
   "background": {
     "service_worker": "background.js"
   },
@@ -15,7 +15,9 @@
     {
       "matches": [
         "https://www.perplexity.ai/*",
-        "https://perplexity.ai/*"
+        "https://perplexity.ai/*",
+        "https://chatgpt.com/*",
+        "https://chat.openai.com/*"
       ],
       "js": [
         "config.js",
