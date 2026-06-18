@@ -378,18 +378,49 @@ function setAutoCopy(on) {
   autoCopyBtn.classList.toggle("on", on);
 }
 
+function getOffsetInContainer(root, node, offset) {
+  const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT);
+  let pos = 0;
+  while (walker.nextNode()) {
+    const current = walker.currentNode;
+    if (current === node) return pos + offset;
+    pos += current.textContent.length;
+  }
+  return pos;
+}
+
 function applyRemoteText(text) {
+  if (answerEl.innerText === text) return;
+
+  const wasFocused = document.activeElement === answerEl;
+  const cursor = wasFocused ? getOffsetInContainer(
+    answerEl,
+    window.getSelection().anchorNode,
+    window.getSelection().anchorOffset
+  ) : null;
+
   applyingRemote = true;
   answerEl.innerText = text;
   applyingRemote = false;
   updatedAt.textContent = new Date().toLocaleTimeString();
   clearRemoteSelection();
+
+  if (wasFocused && cursor !== null) {
+    const pos = Math.min(cursor, text.length);
+    const range = getRangeFromOffsets(pos, pos);
+    if (range) {
+      const sel = window.getSelection();
+      sel.removeAllRanges();
+      sel.addRange(range);
+    }
+  }
 }
 
 function applyIncomingStream(text, ts) {
   if (ts && ts <= lastEditSyncTs) return;
   if (Date.now() - lastEditSyncTs < 15000) return;
   if (!autoCopy && userRole === "edit") return;
+  if (userRole === "edit" && document.activeElement === answerEl) return;
   applyRemoteText(text);
 }
 
@@ -422,10 +453,7 @@ function getSelectionOffsets() {
   const range = sel.getRangeAt(0);
   if (!answerEl.contains(range.commonAncestorContainer)) return null;
 
-  const pre = document.createRange();
-  pre.selectNodeContents(answerEl);
-  pre.setEnd(range.startContainer, range.startOffset);
-  const start = pre.toString().length;
+  const start = getOffsetInContainer(answerEl, range.startContainer, range.startOffset);
   const end = start + range.toString().length;
 
   return { start, end, text: range.toString() };
