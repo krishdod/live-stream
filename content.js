@@ -19,13 +19,34 @@ const SELECTORS = {
 
 let previousAnswer = "";
 
+function extractFormattedText(el) {
+  const clone = el.cloneNode(true);
+
+  clone.querySelectorAll("br").forEach((br) => {
+    br.replaceWith(document.createTextNode("\n"));
+  });
+
+  clone.querySelectorAll("li").forEach((li) => {
+    const bullet = document.createTextNode("\n• ");
+    li.insertBefore(bullet, li.firstChild);
+  });
+
+  clone.querySelectorAll("p").forEach((p, i) => {
+    if (i > 0) {
+      p.insertBefore(document.createTextNode("\n\n"), p.firstChild);
+    }
+  });
+
+  return clone.innerText.replace(/\n{3,}/g, "\n\n").trim();
+}
+
 function getLatestAnswer() {
   const selectors = SELECTORS[SITE] || SELECTORS.perplexity;
 
   for (const selector of selectors) {
     const nodes = document.querySelectorAll(selector);
     if (nodes.length > 0) {
-      return nodes[nodes.length - 1].innerText.trim();
+      return extractFormattedText(nodes[nodes.length - 1]);
     }
   }
 

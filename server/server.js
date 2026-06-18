@@ -45,6 +45,7 @@ async function sendInviteEmail(to, role, link) {
 }
 
 let lastAnswer = "";
+let lastManualEdit = 0;
 
 function securityEnabled() {
   return Boolean(STREAM_KEY || EDIT_KEY || VIEW_KEY);
@@ -178,6 +179,41 @@ const server = http.createServer((req, res) => {
     return;
   }
 
+  if (pathname === "/api/sync" && req.method === "POST") {
+    let body = "";
+    req.on("data", (chunk) => {
+      body += chunk.toString("utf8");
+    });
+
+    req.on("end", () => {
+      try {
+        const parsed = JSON.parse(body || "{}");
+        const auth = validateRole(parsed.role, parsed.key);
+
+        if (!auth.ok || auth.role !== "edit") {
+          res.writeHead(403, { "Content-Type": "application/json" });
+          res.end(JSON.stringify({ error: "Forbidden" }));
+          return;
+        }
+
+        const text = typeof parsed.text === "string" ? parsed.text : null;
+        if (text !== null) {
+          lastManualEdit = Date.now();
+          lastAnswer = text;
+          broadcast({ type: "sync", text, from: "edit", ts: lastManualEdit }, null);
+        }
+
+        res.writeHead(204);
+        res.end();
+      } catch {
+        res.writeHead(400);
+        res.end();
+      }
+    });
+
+    return;
+  }
+
   if (pathname === "/auth" && req.method === "GET") {
     const params = parseQuery(req.url);
     const role = params.get("role");
@@ -214,7 +250,10 @@ const server = http.createServer((req, res) => {
 
         if (text !== null) {
           lastAnswer = text;
-          broadcast({ type: "sync", text, from: "stream" }, null);
+          const now = Date.now();
+          if (now - lastManualEdit > 15000) {
+            broadcast({ type: "sync", text, from: "stream", ts: now }, null);
+          }
         }
 
         res.writeHead(204);
@@ -273,6 +312,9 @@ wss.on("connection", (ws, req) => {
       if (msg.type === "sync" && typeof msg.text === "string") {
         lastAnswer = msg.text;
         msg.clientId = ws.clientId;
+        if (msg.from !== "stream") {
+          lastManualEdit = Date.now();
+        }
         broadcast(msg, ws);
       }
 
