@@ -46,6 +46,7 @@ async function sendInviteEmail(to, role, link) {
 
 let lastAnswer = "";
 let lastManualEdit = 0;
+let autoCopyEnabled = true;
 
 function securityEnabled() {
   return Boolean(STREAM_KEY || EDIT_KEY || VIEW_KEY);
@@ -251,7 +252,9 @@ const server = http.createServer((req, res) => {
         if (text !== null) {
           lastAnswer = text;
           const now = Date.now();
-          broadcast({ type: "sync", text, from: "stream", ts: now }, null);
+          if (autoCopyEnabled) {
+            broadcast({ type: "sync", text, from: "stream", ts: now }, null);
+          }
         }
 
         res.writeHead(204);
@@ -296,6 +299,7 @@ wss.on("connection", (ws, req) => {
   ws.clientId = `c${++clientCounter}`;
 
   ws.send(JSON.stringify({ type: "auth", role: auth.role, clientId: ws.clientId }));
+  ws.send(JSON.stringify({ type: "autoCopy", on: autoCopyEnabled }));
 
   if (lastAnswer) {
     ws.send(JSON.stringify({ type: "sync", text: lastAnswer, from: "server" }));
@@ -319,6 +323,11 @@ wss.on("connection", (ws, req) => {
       if (msg.type === "selection" && typeof msg.start === "number") {
         msg.clientId = ws.clientId;
         broadcast(msg, ws);
+      }
+
+      if (msg.type === "autoCopy" && typeof msg.on === "boolean") {
+        autoCopyEnabled = msg.on;
+        broadcast({ type: "autoCopy", on: autoCopyEnabled }, ws);
       }
     } catch {
       // ignore malformed messages

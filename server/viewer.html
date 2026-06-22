@@ -58,6 +58,7 @@ body {
 
 #shareBtn { background: #1e3a5f; color: #93c5fd; }
 #autoCopyBtn.on { background: #052e16; color: #4ade80; }
+#autoCopyBtn:disabled { opacity: 0.85; cursor: default; }
 
 #roleBadge {
   font-size: 11px;
@@ -379,11 +380,18 @@ let syncTimer = null;
 let selTimer = null;
 let lastEditSyncTs = 0;
 
-function setAutoCopy(on) {
+function setAutoCopy(on, fromRemote = false) {
   autoCopy = on;
   localStorage.setItem("lw-auto-copy", on ? "true" : "false");
   autoCopyBtn.textContent = `Auto Copy: ${on ? "ON" : "OFF"}`;
   autoCopyBtn.classList.toggle("on", on);
+
+  if (!fromRemote && userRole === "edit") {
+    if (ws && ws.readyState === WebSocket.OPEN) {
+      ws.send(JSON.stringify({ type: "autoCopy", on }));
+    }
+    if (!on) scheduleSync();
+  }
 }
 
 function getOffsetInContainer(root, node, offset) {
@@ -428,7 +436,7 @@ function applyRemoteText(text) {
 }
 
 function applyIncomingStream(text, ts) {
-  if (!autoCopy && userRole === "edit") return;
+  if (!autoCopy) return;
 
   if (autoCopy && text.length >= answerEl.innerText.length) {
     applyRemoteText(text);
@@ -565,12 +573,13 @@ function applyRole(role) {
   if (role === "view") {
     answerEl.contentEditable = "false";
     answerEl.classList.add("view-only");
-    autoCopyBtn.classList.add("hidden");
-    autoCopy = true;
+    autoCopyBtn.classList.remove("hidden");
+    autoCopyBtn.disabled = true;
   } else {
     answerEl.contentEditable = "true";
     answerEl.classList.remove("view-only");
     autoCopyBtn.classList.remove("hidden");
+    autoCopyBtn.disabled = false;
     setAutoCopy(autoCopy);
   }
 }
@@ -745,6 +754,9 @@ function connect() {
   ws.onopen = () => {
     statusEl.textContent = "Connected";
     statusEl.className = "status connected";
+    if (userRole === "edit") {
+      ws.send(JSON.stringify({ type: "autoCopy", on: autoCopy }));
+    }
   };
 
   ws.onmessage = (event) => {
@@ -754,6 +766,10 @@ function connect() {
       if (msg.type === "auth") {
         clientId = msg.clientId || "";
         applyRole(msg.role);
+      }
+
+      if (msg.type === "autoCopy" && typeof msg.on === "boolean") {
+        setAutoCopy(msg.on, true);
       }
 
       if (msg.type === "sync" && typeof msg.text === "string") {
