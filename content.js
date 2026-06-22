@@ -6,6 +6,7 @@ const SITE = location.hostname.includes("chatgpt") || location.hostname.includes
 
 const SELECTORS = {
   perplexity: [
+    'div[id^="markdown-content-"] .prose',
     'div.prose[data-renderer="lm"]',
     "div.prose[data-renderer]"
   ],
@@ -17,103 +18,51 @@ const SELECTORS = {
   ]
 };
 
+const MARKER_RE = /^[•*·∙●◦.\-]+$/u;
+const MARKER_PREFIX_RE = /^[•*·∙●◦.\-]\s*/u;
+
 let previousAnswer = "";
 
 function isMarkerOnly(text) {
-  return /^[•*·.\-\s]+$/u.test(text);
+  return MARKER_RE.test(text.trim());
 }
 
-function normalizeBulletText(text) {
-  return text
-    .replace(/\s+/g, " ")
-    .trim()
-    .replace(/^(\*+|•|·|-)\s*/, "");
-}
+function mergeOrphanBullets(text) {
+  const lines = text.split("\n");
+  const out = [];
 
-function flattenMarkerRows(root) {
-  root.querySelectorAll("div, li").forEach((row) => {
-    const kids = [...row.children];
-    if (kids.length < 2) return;
+  for (let i = 0; i < lines.length; i++) {
+    const trimmed = lines[i].trim();
 
-    const marker = kids[0].innerText.trim();
-    if (!isMarkerOnly(marker)) return;
+    if (isMarkerOnly(trimmed)) {
+      while (i + 1 < lines.length && !lines[i + 1].trim()) i++;
+      if (i + 1 < lines.length) {
+        const next = lines[++i].trim();
+        if (next) {
+          out.push(`• ${next.replace(MARKER_PREFIX_RE, "")}`);
+        }
+      }
+      continue;
+    }
 
-    const content = kids.slice(1).map((k) => normalizeBulletText(k.innerText)).filter(Boolean).join(" ");
-    if (!content) return;
+    if (!trimmed) {
+      if (out.length > 0 && out[out.length - 1] !== "") out.push("");
+      continue;
+    }
 
-    row.textContent = `• ${content}`;
-  });
-}
-
-function flattenListItem(li) {
-  const paragraphs = li.querySelectorAll("p");
-  let text = "";
-
-  if (paragraphs.length) {
-    text = [...paragraphs]
-      .map((p) => normalizeBulletText(p.innerText))
-      .filter(Boolean)
-      .join(" ");
-  } else {
-    text = normalizeBulletText(li.innerText);
+    const line = trimmed.replace(MARKER_PREFIX_RE, "• ");
+    out.push(line.startsWith("• ") ? line : line);
   }
 
-  return text ? `• ${text}` : "";
-}
-
-function cleanupExtractedText(text) {
-  return text
-    .replace(/\n[ \t]*[•*·.\-][ \t]*\n[ \t]*/g, "\n• ")
-    .replace(/^\s*[•*·.\-][ \t]*$/gm, "")
-    .replace(/^\s*[*•\-]\s+/gm, "• ")
+  return out
+    .join("\n")
+    .replace(/^•\s*\n+([^\n])/gm, "• $1")
     .replace(/\n{3,}/g, "\n\n")
     .trim();
 }
 
 function extractFormattedText(el) {
-  const clone = el.cloneNode(true);
-  flattenMarkerRows(clone);
-
-  const blocks = [];
-
-  const walk = (node) => {
-    for (const child of node.children) {
-      const tag = child.tagName?.toLowerCase();
-
-      if (tag === "ul" || tag === "ol") {
-        const items = [];
-        child.querySelectorAll(":scope > li").forEach((li) => {
-          const line = flattenListItem(li);
-          if (line) items.push(line);
-        });
-        if (items.length) blocks.push(items.join("\n"));
-        continue;
-      }
-
-      if (tag === "li") continue;
-
-      if (tag === "p" || tag === "blockquote" || tag === "pre") {
-        const text = normalizeBulletText(child.innerText);
-        if (text && !isMarkerOnly(text)) blocks.push(text);
-        continue;
-      }
-
-      if (child.children.length) {
-        walk(child);
-      } else {
-        const text = normalizeBulletText(child.innerText);
-        if (text && !isMarkerOnly(text)) blocks.push(text);
-      }
-    }
-  };
-
-  walk(clone);
-
-  if (!blocks.length) {
-    return cleanupExtractedText(clone.innerText);
-  }
-
-  return cleanupExtractedText(blocks.join("\n\n"));
+  return mergeOrphanBullets(el.innerText);
 }
 
 function getLatestAnswer() {
@@ -166,7 +115,7 @@ function checkAnswer(source) {
   sendAnswer(answer);
 }
 
-console.log(`[Live Workspace] Watching: ${SITE} (extractor v2)`);
+console.log(`[Live Workspace] Watching: ${SITE} (extractor v3)`);
 
 const initialAnswer = getLatestAnswer();
 if (initialAnswer) {
