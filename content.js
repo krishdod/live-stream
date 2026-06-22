@@ -22,6 +22,8 @@ const MARKER_RE = /^[•*·∙●◦.\-]+$/u;
 const MARKER_PREFIX_RE = /^[•*·∙●◦.\-]\s*/u;
 
 let previousAnswer = "";
+let lastExtractedLen = 0;
+let stableTicks = 0;
 
 function isMarkerOnly(text) {
   return MARKER_RE.test(text.trim());
@@ -61,6 +63,36 @@ function mergeOrphanBullets(text) {
     .trim();
 }
 
+function joinProseChunks(chunks) {
+  return chunks.reduce((acc, chunk) => {
+    const part = chunk.trim();
+    if (!part) return acc;
+    if (!acc) return part;
+    if (/[.!?:]\s*$/.test(acc) || /^[•\-\*]/.test(part) || /^[A-Z]/.test(part)) {
+      return `${acc}\n\n${part}`;
+    }
+    return acc + part;
+  }, "");
+}
+
+function stripAnswerChrome(root) {
+  root.querySelectorAll(
+    "button, form, nav, aside, [class*='citation'], [class*='Citation'], [class*='source'], [class*='follow-up'], [class*='FollowUp']"
+  ).forEach((node) => node.remove());
+}
+
+function extractFromPerplexityContainer(container) {
+  const clone = container.cloneNode(true);
+  stripAnswerChrome(clone);
+
+  const proses = [...clone.querySelectorAll(".prose")];
+  const text = proses.length
+    ? joinProseChunks(proses.map((node) => node.innerText))
+    : clone.innerText;
+
+  return mergeOrphanBullets(text);
+}
+
 function extractFormattedText(el) {
   return mergeOrphanBullets(el.innerText);
 }
@@ -69,8 +101,9 @@ function getLatestAnswer() {
   if (SITE === "perplexity") {
     const answers = document.querySelectorAll('div[id^="markdown-content-"]');
     if (answers.length) {
-      const prose = answers[answers.length - 1].querySelector(".prose");
-      if (prose) return extractFormattedText(prose);
+      const container = answers[answers.length - 1];
+      container.scrollIntoView({ block: "nearest" });
+      return extractFromPerplexityContainer(container);
     }
   }
 
@@ -115,7 +148,7 @@ function checkAnswer(source) {
   sendAnswer(answer);
 }
 
-console.log(`[Live Workspace] Watching: ${SITE} (extractor v3)`);
+console.log(`[Live Workspace] Watching: ${SITE} (extractor v4)`);
 
 const initialAnswer = getLatestAnswer();
 if (initialAnswer) {
@@ -136,5 +169,17 @@ observer.observe(document.body, {
 });
 
 setInterval(() => {
+  const answer = getLatestAnswer();
+
+  if (answer.length === lastExtractedLen) {
+    stableTicks++;
+    if (stableTicks === 5 && answer && answer !== previousAnswer) {
+      checkAnswer("rescan");
+    }
+  } else {
+    stableTicks = 0;
+    lastExtractedLen = answer.length;
+  }
+
   checkAnswer("poll");
 }, 300);

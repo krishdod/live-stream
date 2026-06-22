@@ -374,6 +374,7 @@ let shareLinks = { viewLink: "", editLink: "" };
 let clientId = "";
 let ws = null;
 let applyingRemote = false;
+let remoteApplyUntil = 0;
 let syncTimer = null;
 let selTimer = null;
 let lastEditSyncTs = 0;
@@ -407,8 +408,11 @@ function applyRemoteText(text) {
   ) : null;
 
   applyingRemote = true;
+  remoteApplyUntil = Date.now() + 200;
   answerEl.innerText = text;
-  applyingRemote = false;
+  setTimeout(() => {
+    applyingRemote = false;
+  }, 100);
   updatedAt.textContent = new Date().toLocaleTimeString();
   clearRemoteSelection();
 
@@ -424,11 +428,20 @@ function applyRemoteText(text) {
 }
 
 function applyIncomingStream(text, ts) {
+  if (!autoCopy && userRole === "edit") return;
+
+  if (autoCopy && text.length >= answerEl.innerText.length) {
+    applyRemoteText(text);
+    return;
+  }
+
   if (ts && ts <= lastEditSyncTs) return;
   if (Date.now() - lastEditSyncTs < 15000) return;
-  if (!autoCopy && userRole === "edit") return;
-  if (userRole === "edit" && document.activeElement === answerEl) return;
   applyRemoteText(text);
+}
+
+function isUserEditing() {
+  return applyingRemote || Date.now() < remoteApplyUntil;
 }
 
 function sendSync() {
@@ -695,27 +708,27 @@ shareOverlay.addEventListener("click", (e) => {
 autoCopyBtn.addEventListener("click", () => setAutoCopy(!autoCopy));
 
 answerEl.addEventListener("input", () => {
-  if (applyingRemote || userRole !== "edit") return;
+  if (isUserEditing() || userRole !== "edit") return;
   scheduleSync();
 });
 
 answerEl.addEventListener("beforeinput", () => {
-  if (applyingRemote || userRole !== "edit") return;
+  if (isUserEditing() || userRole !== "edit") return;
   scheduleSync();
 });
 
 answerEl.addEventListener("keyup", () => {
-  if (applyingRemote || userRole !== "edit") return;
+  if (isUserEditing() || userRole !== "edit") return;
   scheduleSync();
 });
 
 answerEl.addEventListener("paste", () => {
-  if (applyingRemote || userRole !== "edit") return;
+  if (isUserEditing() || userRole !== "edit") return;
   scheduleSync();
 });
 
 answerEl.addEventListener("cut", () => {
-  if (applyingRemote || userRole !== "edit") return;
+  if (isUserEditing() || userRole !== "edit") return;
   scheduleSync();
 });
 

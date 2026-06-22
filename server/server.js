@@ -251,9 +251,7 @@ const server = http.createServer((req, res) => {
         if (text !== null) {
           lastAnswer = text;
           const now = Date.now();
-          if (now - lastManualEdit > 15000) {
-            broadcast({ type: "sync", text, from: "stream", ts: now }, null);
-          }
+          broadcast({ type: "sync", text, from: "stream", ts: now }, null);
         }
 
         res.writeHead(204);
